@@ -1,0 +1,6 @@
+{
+  "name": "LensCue - Camera Notch Teleprompter",
+  "description": "Desktop and mobile teleprompter designed to hug your camera lens with line-by-line script guidance, pacing controls, and presentation modes.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
