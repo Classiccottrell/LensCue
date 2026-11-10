@@ -73,6 +73,12 @@ export const SHORTCUTS_LIST: ShortcutDefinition[] = [
     category: 'display',
   },
   {
+    key: 'KeyA',
+    label: 'A',
+    description: 'Toggle AI Script Doctor coach',
+    category: 'view',
+  },
+  {
     key: 'Slash',
     label: '? / H',
     description: 'Toggle keyboard shortcuts help',

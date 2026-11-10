@@ -12,6 +12,13 @@ import {
   Eye,
   Sliders,
   FileCode,
+  Mic,
+  Radio,
+  MessageSquare,
+  Zap,
+  Timer,
+  Loader2,
+  Undo2,
 } from 'lucide-react';
 import { ScriptLine, PrompterSettings, SampleScript } from '../types/prompter';
 import {
@@ -29,6 +36,9 @@ interface PreviewViewProps {
   onSelectLine: (index: number) => void;
   onStartPresentation: () => void;
   settings: PrompterSettings;
+  onOpenChatbot?: () => void;
+  onOpenTranscribe?: () => void;
+  onOpenLiveVoice?: () => void;
 }
 
 export const PreviewView: React.FC<PreviewViewProps> = ({
@@ -39,14 +49,65 @@ export const PreviewView: React.FC<PreviewViewProps> = ({
   onSelectLine,
   onStartPresentation,
   settings,
+  onOpenChatbot,
+  onOpenTranscribe,
+  onOpenLiveVoice,
 }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [tab, setTab] = useState<'lines' | 'editor'>('lines');
-  const [copyFeedback, setCopyFeedback] = useState(false);
+  const [isRefining, setIsRefining] = useState(false);
+  const [activeRefineMode, setActiveRefineMode] = useState<string | null>(null);
+  const [previousScript, setPreviousScript] = useState<string | null>(null);
+  const [refineFeedback, setRefineFeedback] = useState<string | null>(null);
 
   const totalWords = calculateTotalWords(lines);
   const totalDuration = calculateTotalDuration(lines);
   const avgWordsPerLine = lines.length > 0 ? (totalWords / lines.length).toFixed(1) : '0';
+
+  const handleQuickRefine = async (mode: 'conversational' | 'cues' | 'sixty_sec' | 'punchy_hook' | 'shorten_lines', label: string) => {
+    if (!rawContent.trim() || isRefining) return;
+
+    setIsRefining(true);
+    setActiveRefineMode(mode);
+    setRefineFeedback(null);
+
+    try {
+      const res = await fetch('/api/ai/refine-script', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ script: rawContent, mode }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to refine script');
+      }
+
+      const data = await res.json();
+      if (data.revisedScript) {
+        setPreviousScript(rawContent);
+        onRawContentChange(data.revisedScript);
+        setRefineFeedback(`Applied: ${label}`);
+        setTimeout(() => setRefineFeedback(null), 3000);
+      }
+    } catch (err: any) {
+      console.error('Quick refine error:', err);
+      setRefineFeedback(`Error: ${err.message}`);
+      setTimeout(() => setRefineFeedback(null), 4000);
+    } finally {
+      setIsRefining(false);
+      setActiveRefineMode(null);
+    }
+  };
+
+  const handleUndo = () => {
+    if (previousScript !== null) {
+      onRawContentChange(previousScript);
+      setPreviousScript(null);
+      setRefineFeedback('Reverted to previous version');
+      setTimeout(() => setRefineFeedback(null), 2500);
+    }
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -148,6 +209,157 @@ export const PreviewView: React.FC<PreviewViewProps> = ({
           <span className="text-[11px] text-zinc-500 font-mono mt-0.5 block">optimal for lens gaze</span>
         </div>
       </div>
+
+      {/* AI Speech & Script Studio */}
+      <section
+        aria-label="AI Speech & Script Studio"
+        className="my-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-b from-zinc-900/90 to-zinc-950 border border-zinc-800/90 shadow-2xl relative overflow-hidden"
+      >
+        <div className="absolute top-0 right-0 w-64 h-32 bg-amber-500/5 blur-3xl pointer-events-none" />
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-zinc-800/80">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400">
+              <Sparkles className="w-4 h-4 fill-amber-400/20" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                <span>AI Speech & Script Studio</span>
+                <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700">
+                  Gemini Models
+                </span>
+              </h2>
+              <p className="text-xs text-zinc-400">
+                Transcribe voice, rehearse with real-time audio, or refine your script for on-camera eye contact.
+              </p>
+            </div>
+          </div>
+
+          {/* Primary AI Tool Modals Launchers */}
+          <div className="flex flex-wrap items-center gap-2">
+            {onOpenTranscribe && (
+              <button
+                type="button"
+                onClick={onOpenTranscribe}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-200 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 rounded-xl transition-all shadow-sm active:scale-95"
+              >
+                <Mic className="w-3.5 h-3.5 text-rose-400" />
+                <span>Dictate (3.5 Transcribe)</span>
+              </button>
+            )}
+
+            {onOpenLiveVoice && (
+              <button
+                type="button"
+                onClick={onOpenLiveVoice}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-200 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 rounded-xl transition-all shadow-sm active:scale-95"
+              >
+                <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                <span>Live Voice Coach (3.8 Live)</span>
+              </button>
+            )}
+
+            {onOpenChatbot && (
+              <button
+                type="button"
+                onClick={onOpenChatbot}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-black bg-gradient-to-r from-amber-300 to-amber-400 hover:from-amber-200 hover:to-amber-300 rounded-xl transition-all shadow-md active:scale-95"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>AI Script Doctor</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 1-Click Fast Refinement Presets */}
+        <div className="pt-3.5 flex flex-wrap items-center justify-between gap-2.5">
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="text-zinc-500 font-mono text-[11px] mr-1 flex items-center gap-1">
+              <Zap className="w-3 h-3 text-amber-400" />
+              1-Click Refine:
+            </span>
+
+            <button
+              type="button"
+              disabled={isRefining}
+              onClick={() => handleQuickRefine('shorten_lines', 'Camera Eye-Lock (5-7 words)')}
+              className="px-2.5 py-1 rounded-lg bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white disabled:opacity-40 transition-colors flex items-center gap-1"
+              title="Reformat lines to 5-7 words so eyes never pan away from webcam lens"
+            >
+              <span>👁️ Camera Eye-Lock</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={isRefining}
+              onClick={() => handleQuickRefine('cues', 'Timing & Stage Cues ([PAUSE], [SMILE])')}
+              className="px-2.5 py-1 rounded-lg bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white disabled:opacity-40 transition-colors flex items-center gap-1"
+              title="Auto-insert rhetorical pauses and lens cues"
+            >
+              <span>⏱️ Timing Cues</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={isRefining}
+              onClick={() => handleQuickRefine('conversational', 'Natural Conversational Cadence')}
+              className="px-2.5 py-1 rounded-lg bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white disabled:opacity-40 transition-colors flex items-center gap-1"
+              title="Transform stiff written text into natural spoken flow"
+            >
+              <span>💬 Conversational</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={isRefining}
+              onClick={() => handleQuickRefine('sixty_sec', '60-Second Video Pitch')}
+              className="px-2.5 py-1 rounded-lg bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white disabled:opacity-40 transition-colors flex items-center gap-1"
+              title="Condense script into a razor-sharp 1-minute elevator pitch (~140 words)"
+            >
+              <span>⚡ 60s Pitch</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={isRefining}
+              onClick={() => handleQuickRefine('punchy_hook', 'Magnetic Opening Hook')}
+              className="px-2.5 py-1 rounded-lg bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white disabled:opacity-40 transition-colors flex items-center gap-1"
+              title="Rewrite the opening 3 seconds to captivate listeners"
+            >
+              <span>🎣 Punchy Hook</span>
+            </button>
+          </div>
+
+          {/* Status or Undo */}
+          <div className="flex items-center gap-2 text-xs">
+            {isRefining && (
+              <span className="flex items-center gap-1.5 text-amber-400 font-mono text-[11px]">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Refining with Gemini...
+              </span>
+            )}
+
+            {refineFeedback && !isRefining && (
+              <span className="text-emerald-400 font-mono text-[11px] bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/40">
+                {refineFeedback}
+              </span>
+            )}
+
+            {previousScript && !isRefining && (
+              <button
+                type="button"
+                onClick={handleUndo}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors font-mono text-[11px]"
+                title="Undo AI changes"
+              >
+                <Undo2 className="w-3 h-3" />
+                <span>Undo</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
 
       {/* Sample Script Switcher Pill Strip */}
       <div className="mb-6 flex flex-wrap items-center gap-2">

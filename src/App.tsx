@@ -9,6 +9,9 @@ import { PreviewView } from './components/PreviewView';
 import { ConfigurationView } from './components/ConfigurationView';
 
 import { ShortcutsModal } from './components/ShortcutsModal';
+import { AudioTranscribeModal } from './components/AudioTranscribeModal';
+import { AiChatbotDrawer } from './components/AiChatbotDrawer';
+import { LiveVoiceCoachModal } from './components/LiveVoiceCoachModal';
 import { isTextInputElement } from './utils/shortcuts';
 
 const STORAGE_KEY_SCRIPT = 'lenscue_script_v1';
@@ -61,6 +64,9 @@ export default function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
+  const [isChatbotOpen, setIsChatbotOpen] = useState(false);
+  const [isTranscribeOpen, setIsTranscribeOpen] = useState(false);
+  const [isLiveVoiceOpen, setIsLiveVoiceOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Helper to show transient keypress toast
@@ -271,6 +277,13 @@ export default function App() {
         return;
       }
 
+      // KeyA: Toggle AI Script Doctor Drawer
+      if (e.code === 'KeyA') {
+        e.preventDefault();
+        setIsChatbotOpen((prev) => !prev);
+        return;
+      }
+
       // ? or KeyH: Toggle Keyboard Shortcuts Modal
       if (e.key === '?' || e.code === 'KeyH') {
         e.preventDefault();
@@ -282,6 +295,12 @@ export default function App() {
       if (e.code === 'Escape') {
         if (isShortcutsOpen) {
           setIsShortcutsOpen(false);
+        } else if (isChatbotOpen) {
+          setIsChatbotOpen(false);
+        } else if (isTranscribeOpen) {
+          setIsTranscribeOpen(false);
+        } else if (isLiveVoiceOpen) {
+          setIsLiveVoiceOpen(false);
         } else if (isPlaying) {
           setIsPlaying(false);
           showToast('⏸ Paused');
@@ -292,7 +311,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentMode, lines.length, isPlaying, isShortcutsOpen]);
+  }, [currentMode, lines.length, isPlaying, isShortcutsOpen, isChatbotOpen, isTranscribeOpen, isLiveVoiceOpen]);
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col selection:bg-zinc-800 selection:text-white">
@@ -342,6 +361,9 @@ export default function App() {
               setIsPlaying(true);
             }}
             settings={settings}
+            onOpenChatbot={() => setIsChatbotOpen(true)}
+            onOpenTranscribe={() => setIsTranscribeOpen(true)}
+            onOpenLiveVoice={() => setIsLiveVoiceOpen(true)}
           />
         )}
 
@@ -391,12 +413,47 @@ export default function App() {
         isFullscreen={isFullscreen}
         onToggleFullscreen={handleToggleFullscreen}
         onOpenShortcuts={() => setIsShortcutsOpen(true)}
+        onOpenChatbot={() => setIsChatbotOpen(true)}
+        onOpenTranscribe={() => setIsTranscribeOpen(true)}
+        onOpenLiveVoice={() => setIsLiveVoiceOpen(true)}
       />
 
       {/* Shortcuts Help Modal */}
       <ShortcutsModal
         isOpen={isShortcutsOpen}
         onClose={() => setIsShortcutsOpen(false)}
+      />
+
+      {/* AI Speech & Script Modals and Drawers */}
+      <AudioTranscribeModal
+        isOpen={isTranscribeOpen}
+        onClose={() => setIsTranscribeOpen(false)}
+        onApplyScript={(newScript, append) => {
+          if (append) {
+            setRawScript((prev) => (prev.trim() ? `${prev}\n\n${newScript}` : newScript));
+          } else {
+            setRawScript(newScript);
+          }
+          setCurrentLineIndex(0);
+          showToast('Script updated from audio');
+        }}
+      />
+
+      <AiChatbotDrawer
+        isOpen={isChatbotOpen}
+        onClose={() => setIsChatbotOpen(false)}
+        currentScript={rawScript}
+        onApplyScript={(newScript) => {
+          setRawScript(newScript);
+          setCurrentLineIndex(0);
+          showToast('Script updated by AI Doctor');
+        }}
+      />
+
+      <LiveVoiceCoachModal
+        isOpen={isLiveVoiceOpen}
+        onClose={() => setIsLiveVoiceOpen(false)}
+        currentScriptTitle="LensCue Teleprompter Script"
       />
     </div>
   );
